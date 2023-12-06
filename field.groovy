@@ -15,11 +15,16 @@ stage('Upload artifacts to JFrog Repo') {
             def buildInfo = server.upload(uploadSpec)
             server.publishBuildInfo(buildInfo)
             
-            def artifacts = buildInfo.getDeployedArtifacts()
-            def artifactUrl = artifacts[0].getRemotePath()
-            env.ARTIFACTORY_URL = "${server.getUrl()}${artifactUrl}"
+            // Capture the artifact URL from the console output
+            def consoleOutput = currentBuild.rawBuild.getLog(1000) // Adjust the number to capture more lines if needed
+            def artifactUrl = consoleOutput =~ /Deploying artifact:\s(https?:\/\/[^ ]+)/
             
-            echo "Artifact URL: ${env.ARTIFACTORY_URL}"
+            if (artifactUrl) {
+                env.ARTIFACTORY_URL = artifactUrl[0][1]
+                echo "Artifact URL: ${env.ARTIFACTORY_URL}"
+            } else {
+                error("Failed to retrieve the artifact URL from console output.")
+            }
         }
     }
 }
