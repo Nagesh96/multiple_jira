@@ -1,29 +1,32 @@
 stage('Upload artifacts to JFrog Repo') {
     steps {
-        echo 'Publishing Artifacts'
         script {
             def server = Artifactory.server('Artifactory')
             def rtMaven = Artifactory.newMavenBuild()
-            def uploadSpec = """
-                {
-                    "files": [{
-                        "pattern": "*.war",
-                        "target": "example-repo-local"
-                    }]
-                }"""
             
-            def buildInfo = server.upload(uploadSpec)
-            server.publishBuildInfo(buildInfo)
+            def uploadSpec = [
+                files: [
+                    [
+                        pattern: '*.war',
+                        target: 'example-repo-local'
+                    ]
+                ]
+            ]
             
-            // Capture the artifact URL from the console output
-            def consoleOutput = currentBuild.rawBuild.getLog(1000) // Adjust the number to capture more lines if needed
-            def artifactUrl = consoleOutput =~ /Deploying artifact:\s(https?:\/\/[^ ]+)/
+            // Capture console output in a variable
+            def consoleOutput = server.upload(uploadSpec).trim()
             
-            if (artifactUrl) {
-                env.ARTIFACTORY_URL = artifactUrl[0][1]
-                echo "Artifact URL: ${env.ARTIFACTORY_URL}"
+            // Extracting JFrog URL using regex
+            def jfrogUrlRegex = ~/https?:\/\/(?:www\.)?jfrog\.com\/[^\s]+/
+            def jfrogUrlMatch = (consoleOutput =~ jfrogUrlRegex)
+            
+            if (jfrogUrlMatch.find()) {
+                def jfrogUrl = jfrogUrlMatch[0]
+                echo "JFrog URL: ${jfrogUrl}"
+                // Use jfrogUrl variable as needed
             } else {
-                error("Failed to retrieve the artifact URL from console output.")
+                echo "JFrog URL not found in console output"
+                // Handle the case when the URL is not found
             }
         }
     }
